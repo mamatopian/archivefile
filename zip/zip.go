@@ -61,6 +61,56 @@ func Archive(inFilePath string, writer io.Writer, progress ProgressFunc) error {
 	return zipWriter.Close()
 }
 
+// Archive compresses a list of files to a writer
+//
+// This method is handy in cases like you got list of files chosen by wildcard (ex. "*.png")
+// and want to compress them into single file
+// @TODO would be fine to merge with Archive method to avoid duplicate code
+func ArchiveList(fileList []string, writer io.Writer, progress ProgressFunc) error {
+	zipWriter := zip_impl.NewWriter(writer)
+	var err error
+
+	for _, file := range fileList {
+		absFile, err := filepath.Abs(file)
+
+		if err != nil {
+			return err
+		}
+
+		fileInfo, err := os.Stat(absFile)
+
+		if err != nil || fileInfo.IsDir() {
+			return err
+		}
+
+		if progress != nil {
+			progress(absFile)
+		}
+
+		archivePath := path.Join(filepath.SplitList(file)...)
+
+		file, err := os.Open(absFile)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			_ = file.Close()
+		}()
+
+		zipFileWriter, err := zipWriter.Create(archivePath)
+		if err != nil {
+			return err
+		}
+
+		_, err = io.Copy(zipFileWriter, file)
+	}
+	if err != nil {
+		return err
+	}
+
+	return zipWriter.Close()
+}
+
 // ArchiveFile compresses a file/directory to a file
 //
 // See Archive() doc
